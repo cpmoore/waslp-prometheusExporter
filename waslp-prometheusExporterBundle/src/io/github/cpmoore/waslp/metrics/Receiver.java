@@ -12,11 +12,10 @@ import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 
-import io.github.cpmoore.waslp.metrics.MetricsScraper.Config;
-import io.github.cpmoore.waslp.metrics.MetricsScraper.Rule;
+import io.github.cpmoore.waslp.metrics.Config;
+import io.github.cpmoore.waslp.metrics.Config.Rule;
 import io.prometheus.client.Collector.MetricFamilySamples;
 import io.prometheus.client.Collector.Type;
-
 public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
 	public Receiver(Config config) {
 		this.config=config;
@@ -31,6 +30,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
     private static Logger LOGGER = Logger.getLogger(klass);
     
     static String toSnakeAndLowerCase(String attrName) {
+    	  
 	      if (attrName == null || attrName.isEmpty()) {
 	        return attrName;
 	      }
@@ -153,7 +153,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         Object beanValue) {
 
       String beanName = domain + angleBrackets(beanProperties.toString()) + angleBrackets(attrKeys.toString());
-      // attrDescription tends not to be useful, so give the fully qualified name too.
+      // attrDescription tends not to be useful, so give the fully qualified name too. 
       String help = attrDescription + " (" + beanName + attrName + ")";
       String attrNameSnakeCase = toSnakeAndLowerCase(attrName);
 
@@ -190,7 +190,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         // If there's no name provided, use default export format.
         if (rule.name == null) {
           defaultExport(domain, beanProperties, attrKeys, rule.attrNameSnakeCase ? attrNameSnakeCase : attrName, help, value, rule.type);
-          return;
+          return; 
         }
 
         // Matcher is set below here due to validation in the constructor.

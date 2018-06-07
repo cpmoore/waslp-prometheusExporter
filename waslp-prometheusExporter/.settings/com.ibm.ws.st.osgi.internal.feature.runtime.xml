@@ -1,2 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<deployment id="waslp-prometheusExporter"/>
+<deployment id="waslp-prometheusExporter">
+    <runtime id="Liberty Runtime"/>
+</deployment>

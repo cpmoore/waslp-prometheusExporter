@@ -21,7 +21,7 @@ import java.util.Hashtable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.osgi.framework.BundleActivator;
+import org.osgi.framework.BundleActivator; 
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.ServiceRegistration;
 import org.osgi.service.cm.ManagedService;
@@ -31,12 +31,13 @@ public class Activator implements BundleActivator  {
 	private static String klass = Activator.class.getName();
 	private static Logger logger = Logger.getLogger(klass);
 	private ServiceRegistration<ManagedService> configRef;
-	private MetricsScraper service;
+	private ScraperService service;
 	@Override
 	public void start(BundleContext context) throws Exception {
 		try {			
-			service=new MetricsScraper(context);
+			service=new ScraperService(context);
 			configRef=context.registerService(ManagedService.class, service, getDefaults());
+			logger.info("Registered prometheus exporter bundle");
 		}catch(Exception e) {
 			logger.log(Level.SEVERE,"Could not register prometheus exporter bundle",e);
 			return;

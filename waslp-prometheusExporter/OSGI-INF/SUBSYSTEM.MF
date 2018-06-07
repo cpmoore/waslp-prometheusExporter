@@ -4,6 +4,6 @@ IBM-ShortName: prometheusExporter-1.0
 Subsystem-SymbolicName: prometheusExporter;visibility:=public
 Subsystem-Version: 1.0.0.qualifier
 Subsystem-Type: osgi.subsystem.feature
-Subsystem-Content: waslp-prometheusExporterBundle;version="1.0.0"
+Subsystem-Content: prometheusExporterBundle;version="1.0.0"
 Manifest-Version: 1.0
 IBM-API-Package: io.github.cpmoore.waslp.metrics

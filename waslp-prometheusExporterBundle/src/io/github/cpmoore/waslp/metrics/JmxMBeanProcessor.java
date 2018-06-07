@@ -24,9 +24,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import javax.management.Attribute;
-import javax.management.AttributeList;
+import javax.management.AttributeList;  
 import javax.management.JMException;
-import javax.management.MBeanAttributeInfo;
+import javax.management.MBeanAttributeInfo; 
 import javax.management.MBeanInfo;
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
@@ -174,7 +174,7 @@ public class JmxMBeanProcessor {
 
 
     public static void scrapeBean(MBeanServerConnection beanConn,MBeanReceiver receiver, ObjectName mbeanName,JmxMBeanPropertyCache jmxMBeanPropertyCache) {
-        MBeanInfo info;
+        MBeanInfo info; 
         try {
           info = beanConn.getMBeanInfo(mbeanName);
         } catch (IOException e) {

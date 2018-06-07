@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metatype:MetaData
+  xmlns:metatype="http://www.osgi.org/xmlns/metatype/v1.1.0"
+  xmlns:ibm="http://www.ibm.com/xmlns/appservers/osgi/metatype/v1.0.0">
+
+  <OCD id="prometheusExporter" name="prometheusExporter">
+    <AD id="id" name="id" type="String" required="false"/>
+    <AD id="baseURL" name="baseURL" type="String" required="false"/>
+    <AD id="username" name="username" type="String" required="false"/>
+    <AD id="password" name="password" type="String" required="false"/>
+    <AD id="includeMemberMetrics" name="includeMemberMetrics" type="Boolean" required="false"/>
+    <AD id="sslProtocol" name="sslProtocol" type="String" required="false"/>
+    <AD id="startDelaySeconds" name="startDelaySeconds" type="Integer" required="false"/>
+    <AD id="lowercaseOutputName" name="lowercaseOutputName" type="Boolean" required="false"/>
+    <AD id="lowercaseOutputLabelNames" name="lowercaseOutputLabelNames" type="Boolean" required="false"/>
+    <AD id="whitelistObjectName" name="whitelistObjectName" type="String" required="false" cardinality="2147483647"/>
+    <AD id="blacklistObjectName" name="blacklistObjectName" type="String" required="false" cardinality="2147483647"/>
+    <AD id="defaultRule" name="defaultRule" ibm:type="pid" ibm:reference="rule-pid" required="false" type="String"/>
+    <AD id="rule" name="rule" ibm:type="pid" ibm:reference="rule-pid" required="false" type="String" cardinality="2147483647" />       
+  </OCD>
+
+  <OCD id="rule" name="rule">
+    <AD id="id" name="id" type="String" required="false" />
+    <AD id="pattern" name="pattern" type="String" required="false" />
+    <AD id="name" name="name" type="String" required="false" />
+    <AD id="help" name="help" type="String" required="false" />
+    <AD id="valueFactor" name="valueFactor" type="Double" required="false" />
+    <AD id="attrNameSnakeCase" name="attrNameSnakeCase" type="Boolean" required="false" />
+    <AD id="type" name="type" type="String" required="false" />
+    <AD id="label" name="label" ibm:type="pid" ibm:reference="label-pid" required="false" type="String" cardinality="2147483647"/>
+  </OCD>
+  
+  <Designate factoryPid="rule-pid">
+    <Object ocdref="rule"/> 
+  </Designate>
+  
+  
+  <Designate pid="prometheusExporter">
+    <Object ocdref="prometheusExporter" />
+  </Designate>
+    
+  <OCD id="label" name="label" >
+    <AD id="name" name="name" type="String" required="true"/>
+    <AD id="value" name="value" type="String" required="true" />
+  </OCD> 
+ 
+
+  <Designate factoryPid="label-pid">
+    <Object ocdref="label" />
+  </Designate>
+  
+</metatype:MetaData>
