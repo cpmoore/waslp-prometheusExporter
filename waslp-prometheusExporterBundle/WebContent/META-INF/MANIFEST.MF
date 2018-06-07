@@ -1,0 +1,27 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: waslp-prometheusExporterBundle
+Bundle-SymbolicName: waslp-prometheusExporterBundle
+Bundle-Version: 1.0.0.qualifier
+Bundle-ClassPath: WEB-INF/classes,
+ WEB-INF/lib/simpleclient-0.3.0.jar,
+ WEB-INF/lib/simpleclient_common-0.3.0.jar,
+ WEB-INF/lib/simpleclient_hotspot-0.3.0.jar,
+ WEB-INF/lib/simpleclient_httpserver-0.3.0.jar
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Web-ContextPath: /prometheusExporter
+Bundle-Activator: io.github.cpmoore.waslp.metrics.Activator
+Import-Package: com.ibm.websphere.crypto;version="1.3.0",
+ com.ibm.websphere.jmx.connector.rest;version="1.4.0",
+ com.ibm.ws.jmx.connector.client.rest;version="1.4.0",
+ javax.el;version="2.0",
+ javax.management,
+ javax.servlet;version="2.5",
+ javax.servlet.http;version="2.5",
+ javax.servlet.jsp;version="2.0",
+ javax.servlet.jsp.el;version="2.0",
+ javax.servlet.jsp.tagext;version="2.0",
+ org.osgi.framework;version="1.8.0",
+ org.osgi.service.cm;version="1.5.0"
+Export-Package: io.github.cpmoore.waslp.metrics
+
