@@ -33,7 +33,7 @@
   <Designate factoryPid="rule-pid">
     <Object ocdref="rule"/> 
   </Designate>
-  
+   
   
   <Designate pid="prometheusExporter">
     <Object ocdref="prometheusExporter" />
@@ -41,7 +41,7 @@
     
   <OCD id="label" name="label" >
     <AD id="name" name="name" type="String" required="true"/>
-    <AD id="value" name="value" type="String" required="true" />
+    <AD id="value" name="value" type="String" required="false" default="" />
   </OCD> 
  
 

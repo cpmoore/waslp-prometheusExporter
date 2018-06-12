@@ -39,6 +39,7 @@ import io.github.cpmoore.waslp.metrics.Config;
 
 public class JmxRouter { 
 	public JmxRouter(Config config) {
+		    this.config=config;
 		    isCollectiveController=null;
 			mainConnection=null;
 			setURL(config.baseURL);
@@ -53,30 +54,23 @@ public class JmxRouter {
 				logger.log(Level.SEVERE, "Exception trying to connect", e1);
 				return;
 			}
-			if(isLibertyServer) {
+			if(defaultUrl!=null&&baseURL!=null&&!baseURL.equals(defaultUrl)) {
 				try {
+					logger.info("Looking up server information for connection to "+baseURL);
 					lookupServerInfo(mainConnection);
 				}catch(Exception e) {
 					logger.log(Level.SEVERE, "Uncaught exception in attempting to lookup server info", e);
 				}
-				if(config.addIdentificationLabels) {
-				    idLabelNames.add("serverHost");
-				    idLabelNames.add("serverUserDir");
-				    idLabelNames.add("serverName");
-				    
-			    }
-			}else if(config.addIdentificationLabels) {
-			    idLabelNames.add("jmxUrl");
-		    }
-			if(config.lowercaseOutputLabelNames) {
-			  for(int i=0;i<idLabelNames.size();i++) {
-				  idLabelNames.set(i,idLabelNames.get(i).toLowerCase());
-			  }
 			}
+			
 		    
 		
 	}
-	private ArrayList<String> idLabelNames=new ArrayList<String>();
+	public Config getConfig() {
+		return config;
+	}
+	private Config config;
+	
 	private MBeanServerConnection mainConnection;
 	private String id;
 	private static String klass = JmxRouter.class.getName();
@@ -96,8 +90,13 @@ public class JmxRouter {
 	private static ObjectName serverInfo=null;
 	private static ObjectName defaultEndpoint=null;
 	private static ObjectName defaultSSLEndpoint=null;
-	
+	final static Map<String,String[]> signatures=new HashMap<String,String[]>();
 	static {
+		  signatures.put("listServers", new String[] {"java.lang.String","java.lang.String"});
+		  signatures.put("listUserDirs", new String[] {"java.lang.String"});
+		  signatures.put("listHosts", new String[] {});
+		  signatures.put("assignServerContext", new String[] {"java.lang.String","java.lang.String","java.lang.String"});
+		  signatures.put("assignHostContext", new String[] {"java.lang.String"});
 		  try {
 			JmxRouter.collectiveRouter=new ObjectName("WebSphere:feature=collectiveController,type=RoutingContext,name=RoutingContext");
 			JmxRouter.collectiveRegistration=new ObjectName("WebSphere:feature=collectiveController,type=CollectiveRegistration,name=CollectiveRegistration");
@@ -112,15 +111,8 @@ public class JmxRouter {
 		}
 		  
 	}
-	final static Map<String,String[]> signatures;
-	static {
-		signatures=new HashMap<String,String[]>();
-		signatures.put("listServers", new String[] {"java.lang.String","java.lang.String"});
-		signatures.put("listUserDirs", new String[] {"java.lang.String"});
-		signatures.put("listHosts", new String[] {});
-		signatures.put("assignServerContext", new String[] {"java.lang.String","java.lang.String","java.lang.String"});
-		signatures.put("assignHostContext", new String[] {"java.lang.String"}); 
-	}
+	
+	
 	public static String[] getSignature(String method,Object...objects) {
 		if(signatures.containsKey(method)) {return signatures.get(method);}
 		String[] sig=new String[objects.length];
@@ -202,9 +194,10 @@ public class JmxRouter {
 
 	public MBeanServerConnection getMbeanServerConnection() throws Exception {
 		if(isCollectiveController==null) {
-			isCollectiveController=false;
-			lookupServerInfo(getMbeanServerConnection());
+			  isCollectiveController=false;
+			  lookupServerInfo(ManagementFactory.getPlatformMBeanServer());
 		}
+		
 		if(!isCollectiveController&&baseURL==null|| (baseURL!=null&&user==null)) {
 			logger.finer("Returning local mbean server connection");
 			return ManagementFactory.getPlatformMBeanServer();
@@ -229,10 +222,7 @@ public class JmxRouter {
 		
 		Map<String, Object> environment = new HashMap<String, Object>(); 
 		
-		 
-		
-		SSLContext sslContext=getSSLContext();
-		environment.put(ClientProvider.CUSTOM_SSLSOCKETFACTORY, sslContext.getSocketFactory()); 
+		environment.put(ClientProvider.CUSTOM_SSLSOCKETFACTORY, getSSLContext().getSocketFactory()); 
 		environment.put(ClientProvider.DISABLE_HOSTNAME_VERIFICATION, true); 
 		if(user!=null&&password!=null) {
 		   environment.put(JMXConnector.CREDENTIALS, new String[] { user,password });    
@@ -266,9 +256,7 @@ public class JmxRouter {
 	
 	
 	
-	public ArrayList<String> getIdLables() {
-		return idLabelNames;
-	}
+	
 	
 	public void setCredentials(String userName,String pass) {
 		logger.finer("Setting credentials for user "+user);
@@ -328,9 +316,6 @@ public class JmxRouter {
 	
 
 	private void lookupServerInfo(MBeanServerConnection mbeanServer) throws IOException, MBeanException {
-		if(!isLibertyServer) {
-			throw new MBeanException(new Exception(),"Not an IBM JMX Connection");
-		}
 		logger.finer("looking up server information for mbean connectinon "+mbeanServer);
 		try {
 			  logger.finer("Getting collective router instance");
@@ -345,6 +330,9 @@ public class JmxRouter {
 			serverName=String.valueOf(mbeanServer.getAttribute(serverInfo, "Name"));
 			defaultHostName=String.valueOf(mbeanServer.getAttribute(serverInfo, "DefaultHostname"));
 			wlpUserDir=String.valueOf(mbeanServer.getAttribute(serverInfo, "UserDirectory"));
+			
+			isLibertyServer=true;
+			
 			while(wlpUserDir.endsWith("/")) {
 				wlpUserDir=wlpUserDir.substring(0,wlpUserDir.length()-1);
 			}
@@ -358,7 +346,12 @@ public class JmxRouter {
 			}catch(AttributeNotFoundException  | InstanceNotFoundException e) {
 				logger.log(Level.SEVERE, "Could not retrieve endpoint info", e);	
 			}
-		} catch (InstanceNotFoundException |AttributeNotFoundException  | ReflectionException e) {
+			
+		} catch (InstanceNotFoundException e) {
+			logger.finer("Determined connection is not a liberty server");
+			isLibertyServer=false;
+		}catch (AttributeNotFoundException  | ReflectionException e){
+			isLibertyServer=false;
 			logger.log(Level.SEVERE, "Could not retrieve server info", e);
 		}
 	}
@@ -376,13 +369,13 @@ public class JmxRouter {
 					    	return;
 					    }
 					}catch(Exception e) {
-						logger.log(Level.SEVERE,"Could not get ssl context for protocol "+inputSSLProtocol,e);
+						logger.log(Level.SEVERE,"Could not get SSLContext for protocol "+inputSSLProtocol,e);
 					}
 				}
 				String[] x=SSLContext.getDefault().getSupportedSSLParameters().getProtocols();
 				sslProtcol=x[x.length-1];
 		    }catch(Exception e) {
-		    	logger.log(Level.SEVERE, "Could not get ssl protcol", e);	
+		    	logger.log(Level.SEVERE, "Could not get default ssl protcol", e);	
 		    }
 	}
 	private SSLContext getSSLContext() throws NoSuchAlgorithmException {

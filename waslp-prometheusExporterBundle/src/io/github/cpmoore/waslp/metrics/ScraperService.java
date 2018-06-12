@@ -41,9 +41,7 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 		private Config currentConfig;
 		final private static String klass = ScraperService.class.getName();
 	    final private static Logger logger = Logger.getLogger(klass);
-	    
-		
-		
+	    		
 	    static final Counter configReloadSuccess = Counter.build()
 	    	      .name("waslp_config_reload_success_total")
 	    	      .help("Number of times configuration have successfully been reloaded.").register();
@@ -53,14 +51,11 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 	    	      .help("Number of times configuration have failed to be reloaded.").register();
 
 	    private long createTimeNanoSecs = System.nanoTime();
-	    
-	    private JmxRouter jmxRouter;
 
-	    
-	   
-	    
-		
+	    private JmxRouter jmxRouter;
 		private HashMap<String,RoutedJmxScraper> registeredScrapers=new HashMap<String,RoutedJmxScraper>();
+		
+		
 	    
 		private void registerHostConnections(JmxRouter router) throws InstanceNotFoundException, MBeanException, IOException {
 				ArrayList<String> z=router.listHosts();	
@@ -166,16 +161,6 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 		    			  RoutedJmxScraper scraper=registeredScrapers.get(key);
 		    			  double error = 0;
 		    			  long start = System.nanoTime();
-				    	  ArrayList<String> labelValues=new ArrayList<String>();
-				    	  if(currentConfig.addIdentificationLabels) {
-				    		  if(jmxRouter.isCollectiveController()) {
-						        labelValues.add(scraper.getHostName());
-						        labelValues.add(scraper.getServerUserDir());
-						        labelValues.add(scraper.getServerName()); 
-				    		  }else {
-				    			labelValues.add(scraper.getName());
-				    		  }
-				    	  }
 				    	  logger.fine("Scraping "+scraper);
 				    	  try {
 						        scraper.doScrape(receiver,currentConfig);
@@ -183,8 +168,8 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 						        error = 1;
 						        logger.log(Level.SEVERE,"JMX scrape failed",e);
 						  } 
-				    	  durationlist.add(new MetricFamilySamples.Sample("waslp_scrape_duration_seconds", jmxRouter.getIdLables(),labelValues, (System.nanoTime() - start) / 1.0E9));
-					      errorlist.add(new MetricFamilySamples.Sample("waslp_scrape_error", jmxRouter.getIdLables(),labelValues, error));
+				    	  durationlist.add(new MetricFamilySamples.Sample("waslp_scrape_duration_seconds", scraper.getLabelNames(),scraper.getLabelValues(), (System.nanoTime() - start) / 1.0E9));
+					      errorlist.add(new MetricFamilySamples.Sample("waslp_scrape_error", scraper.getLabelNames(),scraper.getLabelValues(), error));
 		    		  } 
 		    	  }.start();
 		      }
@@ -220,8 +205,8 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 			 JmxRouter router = null;
 			 try {
 				 Config new_config=new Config(configAdmin,properties);
-				 Boolean newConfig=currentConfig==null;				 
-				 if (newConfig||!new_config.basePropertiesAreEqual(currentConfig)) {  
+				 Boolean firstConfiguration=currentConfig==null;				 
+				 if (firstConfiguration||!new_config.basePropertiesAreEqual(currentConfig)) {  
 					  router=new JmxRouter(new_config);
 					  clearConnections(); 
 				      RoutedJmxScraper scraper=new RoutedJmxScraper(router);
@@ -238,19 +223,21 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 					  if(new_config.initializeDefaultExports) {
 						  DefaultExports.initialize();
 					  }
-					  currentConfig=new_config;
-					  if(newConfig) {
-						 this.register();
-						 jmxRouter=router;
- 					     logger.info("Get ready, get set, scrape!");
- 					     return;
-					  }
-				 }else {
-					 currentConfig=new_config;
-				 }
-				 logger.info("Configuration reloaded");
-				 configReloadSuccess.inc();
-				 jmxRouter=router;
+					  
+				}
+				currentConfig=new_config;
+				jmxRouter=router; 
+			
+			    
+				if(firstConfiguration) {
+					this.register();
+				    logger.info("Get ready, get set, scrape!");
+				   
+				}else {
+					logger.info("Configuration reloaded");
+					configReloadSuccess.inc();
+				}
+				
 			 }catch(Exception e) {
 				 logger.log(Level.SEVERE,"Configuration reload failed: "+e.getMessage(), e);
 			     configReloadFailure.inc();

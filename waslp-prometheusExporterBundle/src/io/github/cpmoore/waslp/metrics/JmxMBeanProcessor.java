@@ -4,10 +4,12 @@ package io.github.cpmoore.waslp.metrics;
 
 /*
  * 
- * The remaining code was copied from Prometheus JMX Exporter
+ * The following code was copied from Prometheus JMX Exporter
  * 
  * https://github.com/prometheus/jmx_exporter
  * 
+ * Some slight modifications were made to pass in a RoutedJmxScraper to the receiver
+ * in order to add default identification labels to identify which connection the MBean was from
  * 
  * 
  */
@@ -28,7 +30,6 @@ import javax.management.AttributeList;
 import javax.management.JMException;
 import javax.management.MBeanAttributeInfo; 
 import javax.management.MBeanInfo;
-import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 import javax.management.openmbean.CompositeData;
 import javax.management.openmbean.CompositeType;
@@ -39,12 +40,13 @@ import javax.management.openmbean.TabularType;
 
 public class JmxMBeanProcessor {
 
-	private static String klass=JmxMBeanProcessor.class.getName();
+	private static String klass = JmxMBeanProcessor.class.getName();
 	private static Logger logger = Logger.getLogger(klass);	
 
     public static interface MBeanReceiver {
     	
         void recordBean(
+        	RoutedJmxScraper scraper,
             String domain,
             LinkedHashMap<String, String> beanProperties,
             LinkedList<String> attrKeys,
@@ -75,6 +77,7 @@ public class JmxMBeanProcessor {
      * out in a way it can be processed elsewhere easily.
      */
     private static void processBeanValue(
+    		RoutedJmxScraper scraper,
     		MBeanReceiver receiver,
             String domain,
             LinkedHashMap<String, String> beanProperties,
@@ -88,6 +91,7 @@ public class JmxMBeanProcessor {
         } else if (value instanceof Number || value instanceof String || value instanceof Boolean) {
             logScrape(domain + beanProperties + attrName, value.toString());
             receiver.recordBean(
+            		scraper,
                     domain,
                     beanProperties,
                     attrKeys,
@@ -105,6 +109,7 @@ public class JmxMBeanProcessor {
                 String typ = type.getType(key).getTypeName();
                 Object valu = composite.get(key);
                 processBeanValue(
+                		scraper,
                 		receiver,
                         domain,
                         beanProperties,
@@ -152,6 +157,7 @@ public class JmxMBeanProcessor {
                             name = attrName;
                         } 
                         processBeanValue(
+                            scraper,
                         	receiver,
                             domain,
                             l2s,
@@ -173,10 +179,10 @@ public class JmxMBeanProcessor {
     }
 
 
-    public static void scrapeBean(MBeanServerConnection beanConn,MBeanReceiver receiver, ObjectName mbeanName,JmxMBeanPropertyCache jmxMBeanPropertyCache) {
+    public static void scrapeBean(RoutedJmxScraper scraper,MBeanReceiver receiver, ObjectName mbeanName,JmxMBeanPropertyCache jmxMBeanPropertyCache) {
         MBeanInfo info; 
         try {
-          info = beanConn.getMBeanInfo(mbeanName);
+          info = scraper.getMbeanConnection().getMBeanInfo(mbeanName);
         } catch (IOException e) {
           logScrape(mbeanName.toString(), "getMBeanInfo Fail: " + e);
           return;
@@ -197,7 +203,7 @@ public class JmxMBeanProcessor {
         }
         final AttributeList attributes;
         try {
-            attributes = beanConn.getAttributes(mbeanName, name2AttrInfo.keySet().toArray(new String[0]));
+            attributes = scraper.getMbeanConnection().getAttributes(mbeanName, name2AttrInfo.keySet().toArray(new String[0]));
         } catch (Exception e) {
             logScrape(mbeanName, name2AttrInfo.keySet(), "Fail: " + e);
             return;
@@ -206,6 +212,7 @@ public class JmxMBeanProcessor {
             MBeanAttributeInfo attr = name2AttrInfo.get(attribute.getName());
             logScrape(mbeanName, attr, "process");
             processBeanValue(
+            		scraper,
             		receiver,
                     mbeanName.getDomain(),
                     jmxMBeanPropertyCache.getKeyPropertyList(mbeanName),

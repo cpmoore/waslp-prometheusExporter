@@ -78,7 +78,10 @@ public class Config {
 	        	return getString(dictionary,key,null);
 	        }
 	        private static String getString(Dictionary<String,?> dictionary,String key,String defaults) {
-	        	Object value=dictionary.get(key);
+	        	Object value=null;
+	        	try {
+	        	  value=dictionary.get(key);
+	        	}catch(Exception e) {}
 	        	if(value ==null) {
 	        		return defaults;
 	        	}else if(value instanceof String) {
@@ -121,9 +124,13 @@ public class Config {
 		    	    whitelistObjectNames=getObjectNameSet(properties,"whitelistObjectName",new String[] {null});
 		    	    blacklistObjectNames=getObjectNameSet(properties,"blacklistObjectName");
 		    	    
+		    	    
+		    	    if(this.username!=null&&this.password==null) {
+		    	    	throw new IllegalArgumentException("Must provide password if user is given: " + properties);
+		    	    }
 		    	    String[] ruleNames=getStringArray(properties,"rule") ;
 		    	    
-		    	    Rule defaultRule=new Rule(configAdmin,null,null);
+		    	    Rule defaultRule=new Rule();
 		    	    try {
 			    	    if(properties.get("defaultRule") !=null) {
 			    	    	String[] defaultRuleList=getStringArray(properties,"defaultRule");
@@ -132,16 +139,23 @@ public class Config {
 			    	    	}
 			    	    	Dictionary<String,?> labelProps=configAdmin.getConfiguration(defaultRuleList[0]).getProperties();
 			    	    	defaultRule=new Rule(configAdmin,labelProps,defaultRule);
+			    	    	logger.info("Configured default rule "+defaultRule);
 			    	    }
 		    	    }catch(Exception e) {
 		    	    	logger.log(Level.SEVERE, "Could not read rule defaults", e);
 		    	    }
 					if (ruleNames.length>0) {
 						for(String rule:ruleNames){  
+							logger.finer("Getting rule configuration for "+rule);
 							Configuration ruleConfig; 
 							try {
 								ruleConfig = configAdmin.getConfiguration(rule);
-								rules.add(new Rule(configAdmin,ruleConfig.getProperties(),defaultRule));
+								logger.finer("Config=>"+ruleConfig.getProperties());
+								Rule r=new Rule(configAdmin,ruleConfig.getProperties(),defaultRule);
+								if(r.enabled) {
+								  rules.add(r);
+								  logger.info("Configured rule "+r);
+								}
 							} catch (IOException e) {
 								logger.log(Level.SEVERE,"Uncaught exception in "+klass+".updated",e);
 								continue;
@@ -149,7 +163,8 @@ public class Config {
 								 
 						}
 					}else {
-						rules.add(new Rule(configAdmin,null,defaultRule));
+						//rules.add(new Rule(configAdmin,null,defaultRule));
+						rules.add(defaultRule);
 					}
 				    
 			
@@ -195,6 +210,9 @@ public class Config {
 		      }
 
 			  public static class Rule {
+				  public Rule(){
+					  
+				  }
 				  public Rule(ConfigurationAdmin configAdmin,Dictionary<String,?> properties,Rule defaultRule){
 					    
 					    if(properties==null) {
@@ -205,7 +223,7 @@ public class Config {
 					    	defaultRule=this;
 					    }
 			            if (properties.get("pattern")!=null) {
-			                this.pattern = Pattern.compile("^.*(?:" + (String)properties.get("pattern") + ").*$");
+			                this.pattern = Pattern.compile("^.*(?:" + ((String)properties.get("pattern")).replace("{", "<").replaceAll("}", ">") + ").*$");
 			            }else if(defaultRule.pattern!=null) {
 			            	this.pattern=defaultRule.pattern;
 			            }
@@ -214,6 +232,7 @@ public class Config {
 			            value=getString(properties,"value",defaultRule.value);
 			            valueFactor=getDouble(properties,"valueFactor",defaultRule.valueFactor);
 			            attrNameSnakeCase=getBoolean(properties,"attrNameSnakeCase",defaultRule.attrNameSnakeCase);
+			            enabled=getBoolean(properties,"enabled",defaultRule.enabled);
 			            
 			            
 			            if (properties.get("type")!=null) { 
@@ -223,8 +242,11 @@ public class Config {
 			            }
 			            
 			            String[] labels=getStringArray(properties,"label");
-			            labelValues=defaultRule.labelValues;
-			            labelNames=defaultRule.labelNames;
+			            if (defaultRule.labelNames!=null) {
+			            	labelValues=new ArrayList<String>(defaultRule.labelValues);
+				            labelNames=new ArrayList<String>(defaultRule.labelNames);	
+			            }
+			            
 			            
 			            if (labels!=null && labels.length>0) {
 			            	  if(this.labelNames==null) {
@@ -234,29 +256,35 @@ public class Config {
 				                this.labelValues = new ArrayList<String>();
 			            	  }
 				              for(String label:labels) {
+				            	  logger.finer("Getting label properties for "+label);
 				            	  try {
 					            	  Dictionary<String,?> labelProps=configAdmin.getConfiguration(label).getProperties();
-					            	  String name=getString(labelProps,"name");
-					            	  String value=getString(labelProps,"value");;
-							          if(name==null||value==null) {
-							               	throw new IllegalArgumentException("Every label must have both a name and a value");
+					            	  logger.finer("Config=>"+labelProps);
+					            	  String labelName=getString(labelProps,"name",null);
+					            	  String labelValue=getString(labelProps,"value","");
+							          if(labelName==null) {
+							               	throw new IllegalArgumentException("Every label must have a name");
 							          }
-							          int index=labelNames.indexOf(name);
+							          if(this.name==null&&hasCaptureGroups(labelName,labelValue)) {
+							        	  throw new IllegalArgumentException("Must provide name if labels with capture groups are given: " + properties);
+							          }
+							          int index=labelNames.indexOf(labelName);
 							          if(index==-1) {
-							              this.labelNames.add((String) labelProps.get("name"));
-							              this.labelValues.add((String) labelProps.get("value"));
+							              this.labelNames.add(labelName);
+							              this.labelValues.add(labelValue);
 							          }else {
-							        	  this.labelValues.set(index, value);
+							        	  this.labelValues.set(index, labelValue);
 							          }
 				            	  }catch(Exception e) {
 				            		  logger.log(Level.SEVERE, "Uncaught exception", e);
 				            	  }
 				              }
 			            }
-			            if ((this.labelNames != null || this.help != null) && this.name == null) {
-			              throw new IllegalArgumentException("Must provide name, if help or labels are given: " + properties);
+			           
+			            if (this.help != null  && this.name == null) {
+			              throw new IllegalArgumentException("Must provide name if help is given: " + properties);
 			            }
-			            if (this.name != null && this.pattern == null) {
+			            if (this.name != null && this.pattern == null) { 
 			              throw new IllegalArgumentException("Must provide pattern, if name is given: " + properties);
 			            }
 				  }
@@ -266,11 +294,41 @@ public class Config {
 			      String help=null;
 			      Double valueFactor=1.0;
 			      Boolean attrNameSnakeCase=true;
+			      Boolean enabled=true;
 			      Type type = Type.UNTYPED;
 			      ArrayList<String> labelNames=null; 
 			      ArrayList<String> labelValues=null;
+			      private static String captureGroup="\\$\\d+";
 			      
-			    }
+			      public String toString(ArrayList<String> names,ArrayList<String> values) {
+			    	  if(names==null) {
+			    		  return "";
+			    	  }
+			    	  StringBuilder sb=new StringBuilder();
+			    	  for (int i =0;i<names.size();i++) {
+			    		  sb.append(names.get(i)+"="+values.get(i)+",");
+			    	  } 
+			    	  if(sb.length()>0) {
+			    	    sb.deleteCharAt(sb.length()-1);
+			    	  }
+			    	  return sb.toString();
+			      }
+			      @Override
+			      public String toString() {
+			    	  return "name["+name+"], pattern["+pattern+"], labels["+toString(labelNames,labelValues)+"]";
+			      }
+			      public static Boolean hasCaptureGroups(String...strings) {
+			    	  for(String s:strings) {
+			    		  if(s.matches(captureGroup)) {
+			    			  return true;
+			    		  }
+			    	  }
+			    	  return false;
+				  }    
+			  }
+			  
+			  
+			  
 			    
 
 }

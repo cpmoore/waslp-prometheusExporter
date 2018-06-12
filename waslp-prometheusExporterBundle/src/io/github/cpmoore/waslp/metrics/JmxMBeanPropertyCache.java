@@ -1,5 +1,17 @@
 package io.github.cpmoore.waslp.metrics;
 
+/*
+ * 
+ * The following code was copied from Prometheus JMX Exporter
+ * 
+ * https://github.com/prometheus/jmx_exporter
+ * 
+ * 
+ * 
+ */
+
+
+
 import javax.management.ObjectName;
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -1,5 +1,18 @@
 package io.github.cpmoore.waslp.metrics;
 
+
+/*
+ * 
+ * The following code was copied from Prometheus JMX Exporter
+ * 
+ * https://github.com/prometheus/jmx_exporter
+ * 
+ * Some slight modifications were made to pass in a RoutedJmxScraper to the functions
+ * in order to add default labels to identify which connection the MBean was from
+ * 
+ * 
+ */
+
 import static java.lang.String.format;
 
 import java.util.ArrayList;
@@ -97,6 +110,8 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
     }
 
     private void defaultExport(
+        RoutedJmxScraper scraper,
+        Rule rule,
         String domain,
         LinkedHashMap<String, String> beanProperties,
         LinkedList<String> attrKeys,
@@ -122,8 +137,26 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         fullname = fullname.toLowerCase();
       }
 
-      List<String> labelNames = new ArrayList<String>();
-      List<String> labelValues = new ArrayList<String>();
+      ArrayList<String> labelNames = new ArrayList<String>();      
+      ArrayList<String> labelValues = new ArrayList<String>();
+
+      //inherit identification labels from RoutedJmxScraper
+      labelNames.addAll(scraper.getLabelNames());
+      labelValues.addAll(scraper.getLabelValues());
+      if (rule.labelNames != null) {
+          for (int i = 0; i < rule.labelNames.size(); i++) {
+            String labelVal= rule.labelValues.get(i);
+            String labelName = safeName(rule.labelNames.get(i));
+            if (config.lowercaseOutputLabelNames) {
+                labelName = labelName.toLowerCase();
+            }
+            mergeLabels(labelName,labelVal,labelNames,labelValues);
+          }
+       }
+
+      
+      
+      
       if (beanProperties.size() > 1) {
           Iterator<Map.Entry<String, String>> iter = beanProperties.entrySet().iterator();
           // Skip the first one, it's been used in the name.
@@ -144,6 +177,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
     }
 
     public void recordBean(
+        RoutedJmxScraper scraper,
         String domain,
         LinkedHashMap<String, String> beanProperties,
         LinkedList<String> attrKeys,
@@ -189,7 +223,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
 
         // If there's no name provided, use default export format.
         if (rule.name == null) {
-          defaultExport(domain, beanProperties, attrKeys, rule.attrNameSnakeCase ? attrNameSnakeCase : attrName, help, value, rule.type);
+          defaultExport(scraper,rule,domain, beanProperties, attrKeys, rule.attrNameSnakeCase ? attrNameSnakeCase : attrName, help, value, rule.type);
           return; 
         }
 
@@ -210,6 +244,11 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         // Set the labels.
         ArrayList<String> labelNames = new ArrayList<String>();
         ArrayList<String> labelValues = new ArrayList<String>();
+        
+        //inherit identification labels from RoutedJmxScraper
+        labelNames.addAll(scraper.getLabelNames());
+        labelValues.addAll(scraper.getLabelValues());
+        
         if (rule.labelNames != null) {
           for (int i = 0; i < rule.labelNames.size(); i++) {
             final String unsafeLabelName = rule.labelNames.get(i);
@@ -220,10 +259,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
               if (config.lowercaseOutputLabelNames) {
                 labelName = labelName.toLowerCase();
               }
-              if (!labelName.isEmpty() && !labelValue.isEmpty()) {
-                labelNames.add(labelName);
-                labelValues.add(labelValue);
-              }
+              mergeLabels(labelName,labelValue,labelNames,labelValues);
             } catch (Exception e) {
               throw new RuntimeException(
                 format("Matcher '%s' unable to use: '%s' value: '%s'", matcher, unsafeLabelName, labelValReplacement), e);
@@ -237,5 +273,24 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         return;
       }
     }
-
+    
+    private void mergeLabels(String labelName,String labelValue,ArrayList<String> labelNames,ArrayList<String> labelValues) {
+	     if(labelName.isEmpty()) {
+	    		return;
+	     }
+	     Boolean isEmpty=labelValue.isEmpty();
+	   	 int index=labelNames.indexOf(labelName);
+	   	 //if not in array, add labels
+	   	 if(index==-1 && !labelValue.isEmpty()) {
+	          labelNames.add(labelName);
+	          labelValues.add(labelValue);
+	        //if value is empty and in array, remove from array
+	   	 }else if(isEmpty) {
+	   		 labelNames.remove(index);
+	   		 labelValues.remove(index);
+	   	 //if value is not empty and in array, set value to new value
+	   	 }else {
+	   		 labelValues.set(index, labelValue);
+	   	 }
+    }
   }
