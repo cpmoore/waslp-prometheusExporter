@@ -30,7 +30,8 @@ import com.ibm.websphere.crypto.InvalidPasswordDecodingException;
 import com.ibm.websphere.crypto.UnsupportedCryptoAlgorithmException;
 import com.ibm.ws.jmx.connector.client.rest.ClientProvider;
 
-import io.github.cpmoore.waslp.metrics.Config;
+import io.github.cpmoore.waslp.metrics.Config.Connection;
+
 
 
 
@@ -38,22 +39,18 @@ import io.github.cpmoore.waslp.metrics.Config;
 
 
 public class JmxRouter { 
-	public JmxRouter(Config config) {
+	public JmxRouter(Connection config) throws Exception {
 		    this.config=config;
 		    isCollectiveController=null;
-			mainConnection=null;
+			mainConnection=null; 
 			setURL(config.baseURL);
 			setCredentials(config.username,config.password);
 			setSSLProtocol(config.sslProtcol);
 			MBeanServerConnection mainConnection;
 
 		
-			try {
-				mainConnection = getMbeanServerConnection();
-			} catch (Exception e1) {
-				logger.log(Level.SEVERE, "Exception trying to connect", e1);
-				return;
-			}
+			
+			mainConnection = getMbeanServerConnection();
 			if(defaultUrl!=null&&baseURL!=null&&!baseURL.equals(defaultUrl)) {
 				try {
 					logger.info("Looking up server information for connection to "+baseURL);
@@ -66,10 +63,10 @@ public class JmxRouter {
 		    
 		
 	}
-	public Config getConfig() {
+	public Connection getConfig() {
 		return config;
 	}
-	private Config config;
+	private Connection config;
 	
 	private MBeanServerConnection mainConnection;
 	private String id;

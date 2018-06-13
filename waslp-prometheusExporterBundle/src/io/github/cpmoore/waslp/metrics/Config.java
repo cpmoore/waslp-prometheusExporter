@@ -41,7 +41,7 @@ public class Config {
 	        	}else if(value instanceof Boolean) {
 	        		return (Boolean)value;
 	        	}else if(value instanceof String) {
-	        		try {
+	        		try { 
 	        		  return Boolean.parseBoolean(((String) value).toLowerCase());
 	        	    }catch(Exception e) {}
 	        	}
@@ -111,24 +111,39 @@ public class Config {
 			public Config(ConfigurationAdmin configAdmin,Dictionary<String,?> properties) {
 		    	    if(properties==null) {properties=new Hashtable<String,Object>();}
 		    	    logger.finer("Building config with properties =>"+properties);
-		    	    sslProtcol=getString(properties,"sslProtcol");
-		    	    baseURL=getString(properties,"baseURL");
-		    	    username=getString(properties,"username");
-		    	    password=getString(properties,"password");
+		    	    
 		    	    startDelaySeconds=getInteger(properties,"startDelaySeconds",0); 
 		    	    lowercaseOutputName=getBoolean(properties,"lowercaseOutputName",true);
 		    	    lowercaseOutputLabelNames=getBoolean(properties,"lowercaseOutputLabelNames",true);
-		    	    addIdentificationLabels=getBoolean(properties,"addIdentificationLabels",true);
-		    	    includeMemberMetrics=getBoolean(properties,"includeMemberMetrics",true);
+		    	    
+		    	    
 		    	    initializeDefaultExports=getBoolean(properties,"initializeDefaultExports",false);
 		    	    whitelistObjectNames=getObjectNameSet(properties,"whitelistObjectName",new String[] {null});
 		    	    blacklistObjectNames=getObjectNameSet(properties,"blacklistObjectName");
-		    	    
-		    	    
-		    	    if(this.username!=null&&this.password==null) {
-		    	    	throw new IllegalArgumentException("Must provide password if user is given: " + properties);
-		    	    }
 		    	    String[] ruleNames=getStringArray(properties,"rule") ;
+		    	    
+		    	    
+		    	    String[] connectionNames=getStringArray(properties,"connection") ;
+		    	    
+		    	    if (connectionNames.length>0) {
+						for(String connName:connectionNames){  
+							logger.finer("Getting connection configuration for "+connName);
+							Configuration connectionConfig; 
+							try {
+								connectionConfig = configAdmin.getConfiguration(connName);
+								logger.finer("Config=>"+connectionConfig.getProperties());
+								Connection connection=new Connection(connectionConfig.getProperties());
+								connections.add(connection);
+							} catch (IOException e) {
+								logger.log(Level.SEVERE,"Uncaught exception in "+klass+".updated",e);
+								continue;
+							}
+								 
+						}
+					}else {
+						connections.add(new Connection());
+					}
+		    	    
 		    	    
 		    	    Rule defaultRule=new Rule();
 		    	    try {
@@ -163,7 +178,6 @@ public class Config {
 								 
 						}
 					}else {
-						//rules.add(new Rule(configAdmin,null,defaultRule));
 						rules.add(defaultRule);
 					}
 				    
@@ -171,20 +185,17 @@ public class Config {
 		      }
 			  final private static String klass = Config.class.getName();
 			  final private static Logger logger = Logger.getLogger(klass);
-			  List<Rule> rules = new ArrayList<Rule>();		  
+			  List<Rule> rules = new ArrayList<Rule>();
+			  List<Connection> connections = new ArrayList<Connection>();
 			  
 			  
 			  
 			  
-		      String sslProtcol;
-		      String baseURL;
-		      String username;
-		      String password;
+		      
 		      Integer startDelaySeconds = 0;
 		      boolean lowercaseOutputName;
 		      boolean lowercaseOutputLabelNames;
-		      boolean includeMemberMetrics;
-		      boolean addIdentificationLabels;
+		      
 		      Set<ObjectName> whitelistObjectNames;
 		      Set<ObjectName> blacklistObjectNames;
 		      boolean initializeDefaultExports=false;
@@ -192,16 +203,22 @@ public class Config {
 			  
 			  
 		      public Boolean basePropertiesAreEqual(Config config) {
+		    	  if(config.connections.size()!=connections.size()) {
+		    		  return false;
+		    	  }
+		    	  for(Connection connection:connections) {
+		    		  for(int i=0;i<connections.size();i++) {
+		    			  if(!connection.equals(config.connections.get(i))) {
+		    				  return false;
+		    			  }
+		    		  }
+		    		  
+		    	  }
 		    	  return ( 
-		    			  config.sslProtcol==this.sslProtcol &&
-		    			  config.baseURL == this.baseURL && 
-		    			  config.username == this.username && 
-		    			  config.password == this.password &&
+		    			  
 		    			  config.startDelaySeconds == this.startDelaySeconds &&
 		    			  config.lowercaseOutputLabelNames==this.lowercaseOutputLabelNames &&
 		    			  config.lowercaseOutputName == this.lowercaseOutputName &&
-		    			  config.includeMemberMetrics == this.includeMemberMetrics &&
-		    			  config.addIdentificationLabels == this.addIdentificationLabels &&
 		    			  config.whitelistObjectNames.equals(this.whitelistObjectNames) && 
 		    			  config.blacklistObjectNames.equals(this.blacklistObjectNames) &&
 		    			  config.initializeDefaultExports == this.initializeDefaultExports
@@ -327,6 +344,40 @@ public class Config {
 				  }    
 			  }
 			  
+			  
+			  public static class Connection {
+				  public Connection(){
+					  this(null);
+				  }
+				  public Connection(Dictionary<String,?> properties){
+					    if(properties==null) {properties=new Hashtable<String,Object>();}
+			    	    sslProtcol=getString(properties,"sslProtcol");
+			    	    baseURL=getString(properties,"baseURL");
+			    	    username=getString(properties,"username");
+			    	    password=getString(properties,"password");
+			    	    addIdentificationLabels=getBoolean(properties,"addIdentificationLabels",true);
+			    	    includeMemberMetrics=getBoolean(properties,"includeMemberMetrics",true);
+			    	    if(this.username!=null&&this.password==null) {
+			    	    	throw new IllegalArgumentException("Must provide password if user is given: " + properties);
+			    	    }
+					  
+				  }
+				  public Boolean equals(Connection config) {
+					  return  config.sslProtcol==this.sslProtcol &&
+			    			  config.baseURL == this.baseURL &&  
+			    			  config.username == this.username && 
+			    			  config.password == this.password &&
+			    			  config.addIdentificationLabels == this.addIdentificationLabels &&
+	    			          config.includeMemberMetrics == this.includeMemberMetrics;
+				  }
+				  String sslProtcol;
+			      String baseURL;
+			      String username;
+			      String password;
+			      boolean includeMemberMetrics;
+				  boolean addIdentificationLabels;
+    			  
+			  }
 			  
 			  
 			    

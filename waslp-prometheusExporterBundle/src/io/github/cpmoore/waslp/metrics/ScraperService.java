@@ -20,6 +20,7 @@ import org.osgi.service.cm.ConfigurationAdmin;
 import org.osgi.service.cm.ConfigurationException;
 import org.osgi.service.cm.ManagedService;
 
+import io.github.cpmoore.waslp.metrics.Config.Connection;
 import io.prometheus.client.Collector;
 import io.prometheus.client.Counter;
 import io.prometheus.client.hotspot.DefaultExports;
@@ -166,7 +167,7 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 						        scraper.doScrape(receiver,currentConfig);
 						  } catch (Exception e) {
 						        error = 1;
-						        logger.log(Level.SEVERE,"JMX scrape failed",e);
+						        logger.log(Level.SEVERE,"Failed to scrape "+scraper,e); 
 						  } 
 				    	  durationlist.add(new MetricFamilySamples.Sample("waslp_scrape_duration_seconds", scraper.getLabelNames(),scraper.getLabelValues(), (System.nanoTime() - start) / 1.0E9));
 					      errorlist.add(new MetricFamilySamples.Sample("waslp_scrape_error", scraper.getLabelNames(),scraper.getLabelValues(), error));
@@ -193,46 +194,80 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 	    }
 
 	    public void clearConnections() {
+	    	for(RoutedJmxScraper scraper:registeredScrapers.values()) {
+	    		scraper.destroy();
+	    	}
 	    	registeredScrapers.clear();
 	    }
 	    
 	    
-	    
-	    
+	    public void connectToOne(Connection connection) { 
+	    	Thread thread =new Thread() {
+	    		public void run() {
+	    			while(true) {
+	    				try {
+	    				  JmxRouter router=new JmxRouter(connection);
+	    				  RoutedJmxScraper scraper=new RoutedJmxScraper(router);
+	    				  addConnection(scraper);
+	    				  logger.info("Registered "+scraper);
+	    				  if(connection.includeMemberMetrics&&router.isCollectiveController()) {
+	    						try {
+	    						     registerHostConnections(router);
+	    						}catch(Exception e) {
+	    							 logger.log(Level.SEVERE, "Could not register remote hosts", e);
+	    						} 
+	    				  }
+	  			          break;
+	    				}catch(Exception e) {
+	    					logger.log(Level.SEVERE,"Exception trying to connect, will retry in 15 seconds",e);
+	    					try {
+							    Thread.sleep(15000);
+							} catch (InterruptedException e1) {
+								return;
+							}  
+	    				}
+    				   
+	    			}
+	    		}
+	    	}; 
+	    	thread.start();
+	    	threads.add(thread);
+	    }
+	    Set<Thread> threads=new HashSet<Thread>();
 		@Override
-		public void updated(Dictionary<String, ?> properties) throws ConfigurationException { 
+		public void updated(final Dictionary<String, ?> properties) throws ConfigurationException {
+			 //stop trying to connect, if trying
+			 for(Thread connect_thread:threads) {
+				 if (connect_thread.isAlive()) {
+					 connect_thread.interrupt();
+				 }
+			 }
+			 threads.clear();
+			 
+			 
 			 logger.info("Received updated properties");
-			 JmxRouter router = null;
+			 
 			 try {
 				 Config new_config=new Config(configAdmin,properties);
 				 Boolean firstConfiguration=currentConfig==null;				 
-				 if (firstConfiguration||!new_config.basePropertiesAreEqual(currentConfig)) {  
-					  router=new JmxRouter(new_config);
-					  clearConnections(); 
-				      RoutedJmxScraper scraper=new RoutedJmxScraper(router);
-					  addConnection(scraper);
-					  logger.info("Registered "+scraper);
-					  if(new_config.includeMemberMetrics&&router.isCollectiveController()) {
-							try {
-							     registerHostConnections(router);
-							}catch(Exception e) {
-								 logger.log(Level.SEVERE, "Could not register remote hosts", e);
-							} 
+				 
+				 if (firstConfiguration||!new_config.basePropertiesAreEqual(currentConfig)) {
+					 clearConnections(); 
+					  for(Connection c:new_config.connections) {
+						  connectToOne(c);
 					  }
-					  
 					  if(new_config.initializeDefaultExports) {
 						  DefaultExports.initialize();
 					  }
 					  
 				}
 				currentConfig=new_config;
-				jmxRouter=router; 
+			 
 			
 			    
 				if(firstConfiguration) {
 					this.register();
-				    logger.info("Get ready, get set, scrape!");
-				   
+				    logger.info("On your mark...get set...SCRAPE!"); 
 				}else {
 					logger.info("Configuration reloaded");
 					configReloadSuccess.inc();

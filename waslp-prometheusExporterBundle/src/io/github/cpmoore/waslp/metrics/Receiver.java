@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -93,11 +92,32 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
 	    
 
 
-    // [] and () are special in regexes, so swtich to <>.
-    private String angleBrackets(String s) {
+    private static void mergeLabels(String labelName,String labelValue,ArrayList<String> labelNames,ArrayList<String> labelValues) {
+	     if(labelName.isEmpty()) {
+	    		return;
+	     }
+	     Boolean isEmpty=labelValue.isEmpty();
+	   	 int index=labelNames.indexOf(labelName);
+	   	 //if not in array, add labels
+	   	 if(index==-1 && !labelValue.isEmpty()) {
+	          labelNames.add(labelName);
+	          labelValues.add(labelValue);
+	        //if value is empty and in array, remove from array
+	   	 }else if(isEmpty) {
+	   		 labelNames.remove(index);
+	   		 labelValues.remove(index);
+	   	 //if value is not empty and in array, set value to new value
+	   	 }else {
+	   		 labelValues.set(index, labelValue);
+	   	 }
+	}
+
+	// [] and () are special in regexes, so swtich to <>.
+    private static String angleBrackets(String s) {
       return "<" + s.substring(1, s.length() - 1) + ">";
     }
-
+    
+    
     void addSample(MetricFamilySamples.Sample sample, Type type, String help) {
       MetricFamilySamples mfs = metricFamilySamplesMap.get(sample.name);
       if (mfs == null) {
@@ -175,7 +195,7 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
       addSample(new MetricFamilySamples.Sample(fullname, labelNames, labelValues, ((Number)value).doubleValue()),
         type, help);
     }
-
+    
     public void recordBean(
         RoutedJmxScraper scraper,
         String domain,
@@ -272,25 +292,5 @@ public class Receiver implements JmxMBeanProcessor.MBeanReceiver {
         addSample(new MetricFamilySamples.Sample(name, labelNames, labelValues, value.doubleValue()), rule.type, help);
         return;
       }
-    }
-    
-    private void mergeLabels(String labelName,String labelValue,ArrayList<String> labelNames,ArrayList<String> labelValues) {
-	     if(labelName.isEmpty()) {
-	    		return;
-	     }
-	     Boolean isEmpty=labelValue.isEmpty();
-	   	 int index=labelNames.indexOf(labelName);
-	   	 //if not in array, add labels
-	   	 if(index==-1 && !labelValue.isEmpty()) {
-	          labelNames.add(labelName);
-	          labelValues.add(labelValue);
-	        //if value is empty and in array, remove from array
-	   	 }else if(isEmpty) {
-	   		 labelNames.remove(index);
-	   		 labelValues.remove(index);
-	   	 //if value is not empty and in array, set value to new value
-	   	 }else {
-	   		 labelValues.set(index, labelValue);
-	   	 }
     }
   }
