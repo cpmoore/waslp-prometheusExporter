@@ -90,6 +90,7 @@ public class Config {
 	        		return String.valueOf(value);
 	        	}
 	        }
+
 	        private static Set<ObjectName> getObjectNameSet(Dictionary<String,?> dictionary,String key,String... defaults) {
 	           Object arr=getStringArray(dictionary,key,defaults);
 	           Set<ObjectName> list = new HashSet<ObjectName>();
@@ -108,28 +109,35 @@ public class Config {
 	         
 	        }
 		    
-			public Config(ConfigurationAdmin configAdmin,Dictionary<String,?> properties) {
+			public Config(ConfigurationAdmin configAdmin,Dictionary<String,?> properties) throws Exception{
 		    	    if(properties==null) {properties=new Hashtable<String,Object>();}
 		    	    logger.finer("Building config with properties =>"+properties);
-		    	    
-		    	    startDelaySeconds=getInteger(properties,"startDelaySeconds",0); 
+		    	    path=getString(properties,"path","/");
+		    	    startDelaySeconds=getInteger(properties,"startDelaySeconds",0);
 		    	    lowercaseOutputName=getBoolean(properties,"lowercaseOutputName",true);
 		    	    lowercaseOutputLabelNames=getBoolean(properties,"lowercaseOutputLabelNames",true);
-		    	    
-		    	    
 		    	    initializeDefaultExports=getBoolean(properties,"initializeDefaultExports",false);
 		    	    whitelistObjectNames=getObjectNameSet(properties,"whitelistObjectName",new String[] {null});
 		    	    blacklistObjectNames=getObjectNameSet(properties,"blacklistObjectName");
 		    	    String[] ruleNames=getStringArray(properties,"rule") ;
-		    	    
-		    	    
 		    	    String[] connectionNames=getStringArray(properties,"connection") ;
+		    	    path=path.trim().toLowerCase();
+		    	    while(path.endsWith("/")) {
+		    	    	path=path.substring(0,path.length()-1);
+		    	    }
+		    	    if(path.equals("")) {
+		    	    	path="/";
+		    	    }
+		    	    if(!path.startsWith("/")) {
+		    	    	path="/"+path;
+		    	    }
 		    	    
-		    	    if (connectionNames.length>0) {
-						for(String connName:connectionNames){  
-							logger.finer("Getting connection configuration for "+connName);
+		    	    
+		    	    
+					for(String connName:connectionNames){  
+							logger.info("Getting connection configuration for "+connName);
 							Configuration connectionConfig; 
-							try {
+							try { 
 								connectionConfig = configAdmin.getConfiguration(connName);
 								logger.finer("Config=>"+connectionConfig.getProperties());
 								Connection connection=new Connection(connectionConfig.getProperties());
@@ -139,13 +147,14 @@ public class Config {
 								continue;
 							}
 								 
-						}
-					}else {
+					}
+					if(connections.size()==0) {
 						connections.add(new Connection());
 					}
 		    	    
 		    	    
 		    	    Rule defaultRule=new Rule();
+		    	    
 		    	    try {
 			    	    if(properties.get("defaultRule") !=null) {
 			    	    	String[] defaultRuleList=getStringArray(properties,"defaultRule");
@@ -159,25 +168,25 @@ public class Config {
 		    	    }catch(Exception e) {
 		    	    	logger.log(Level.SEVERE, "Could not read rule defaults", e);
 		    	    }
-					if (ruleNames.length>0) {
-						for(String rule:ruleNames){  
-							logger.finer("Getting rule configuration for "+rule);
-							Configuration ruleConfig; 
-							try {
-								ruleConfig = configAdmin.getConfiguration(rule);
-								logger.finer("Config=>"+ruleConfig.getProperties());
-								Rule r=new Rule(configAdmin,ruleConfig.getProperties(),defaultRule);
-								if(r.enabled) {
-								  rules.add(r);
-								  logger.info("Configured rule "+r);
-								}
-							} catch (IOException e) {
-								logger.log(Level.SEVERE,"Uncaught exception in "+klass+".updated",e);
-								continue;
+					
+					for(String rule:ruleNames){  
+						logger.finer("Getting rule configuration for "+rule);
+						Configuration ruleConfig; 
+						try {
+							ruleConfig = configAdmin.getConfiguration(rule);
+							logger.finer("Config=>"+ruleConfig.getProperties());
+							Rule r=new Rule(configAdmin,ruleConfig.getProperties(),defaultRule);
+							if(r.enabled) {
+							  rules.add(r);
+							  logger.info("Configured rule "+r);
 							}
-								 
+						} catch (IOException e) {
+							logger.log(Level.SEVERE,"Uncaught exception in "+klass+".updated",e);
+							continue;
 						}
-					}else {
+							 
+					}
+					if(rules.size()==0) {
 						rules.add(defaultRule);
 					}
 				    
@@ -191,7 +200,7 @@ public class Config {
 			  
 			  
 			  
-		      
+		      String path="/";
 		      Integer startDelaySeconds = 0;
 		      boolean lowercaseOutputName;
 		      boolean lowercaseOutputLabelNames;
@@ -217,6 +226,7 @@ public class Config {
 		    	  return ( 
 		    			  
 		    			  config.startDelaySeconds == this.startDelaySeconds &&
+		    			  config.path.equalsIgnoreCase(this.path) &&
 		    			  config.lowercaseOutputLabelNames==this.lowercaseOutputLabelNames &&
 		    			  config.lowercaseOutputName == this.lowercaseOutputName &&
 		    			  config.whitelistObjectNames.equals(this.whitelistObjectNames) && 

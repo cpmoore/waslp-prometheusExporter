@@ -5,8 +5,8 @@
 
   <OCD id="prometheusExporter" name="prometheusExporter">
     <AD id="id" name="id" type="String" required="false"/>
-    <AD id="connection" name="connection" ibm:type="pid" ibm:reference="connection-pid" required="false" type="String" cardinality="2147483647" />    
-    <AD id="sslProtocol" name="sslProtocol" type="String" required="false"/>
+    <AD id="connection" name="connection" ibm:type="pid" ibm:reference="connection-pid" required="false" type="String" cardinality="2147483647" />
+    <AD id="path" name="path" type="String" default="/" required="false"/>        
     <AD id="startDelaySeconds" name="startDelaySeconds" type="Integer" required="false"/>
     <AD id="lowercaseOutputName" name="lowercaseOutputName" type="Boolean" required="false"/>
     <AD id="lowercaseOutputLabelNames" name="lowercaseOutputLabelNames" type="Boolean" required="false"/>
@@ -16,13 +16,13 @@
     <AD id="rule" name="rule" ibm:type="pid" ibm:reference="rule-pid" required="false" type="String" cardinality="2147483647" />       
   </OCD>
 
-
     
   <OCD id="connection" name="connection" >
     <AD id="id" name="id" type="String" required="false"/>
     <AD id="baseURL" name="baseURL" type="String" required="false"/>
     <AD id="username" name="username" type="String" required="false"/>
     <AD id="password" name="password" type="String" required="false"/>
+    <AD id="sslProtocol" name="sslProtocol" type="String" required="false"/>
     <AD id="includeMemberMetrics" name="includeMemberMetrics" type="Boolean" default="true" required="false"/>
     <AD id="addIdentificationLabels" name="addIdentificationLabels" type="Boolean" default="true" required="false"/>
   </OCD> 
@@ -48,7 +48,7 @@
   </Designate>
    
   
-  <Designate pid="prometheusExporter">
+  <Designate factoryPid="prometheusExporter" pid="prometheusExporter">
     <Object ocdref="prometheusExporter" />
   </Designate>
     

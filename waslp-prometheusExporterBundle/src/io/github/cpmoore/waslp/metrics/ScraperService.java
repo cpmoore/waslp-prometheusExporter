@@ -22,35 +22,36 @@ import org.osgi.service.cm.ManagedService;
 
 import io.github.cpmoore.waslp.metrics.Config.Connection;
 import io.prometheus.client.Collector;
+import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.Counter;
-import io.prometheus.client.hotspot.DefaultExports;
+import io.prometheus.client.hotspot.BufferPoolsExports;
+import io.prometheus.client.hotspot.ClassLoadingExports;
+import io.prometheus.client.hotspot.GarbageCollectorExports;
+import io.prometheus.client.hotspot.MemoryPoolsExports;
+import io.prometheus.client.hotspot.StandardExports;
+import io.prometheus.client.hotspot.ThreadExports;
+import io.prometheus.client.hotspot.VersionInfoExports;
 
 
 
 
 
-public class ScraperService extends Collector implements ManagedService,Collector.Describable{
+public class ScraperService extends Collector implements Collector.Describable,ManagedService{
 		
-		public ScraperService(BundleContext context) {
-			ServiceReference<?> configurationAdminReference = context.getServiceReference(ConfigurationAdmin.class.getName());
-			if(configurationAdminReference!=null) {
-			    configAdmin = (ConfigurationAdmin) context.getService(configurationAdminReference);
-			}
+		public ScraperService(ConfigurationAdmin configAdmin) {
+			this.configAdmin=configAdmin;
 		}
 		
-		private ConfigurationAdmin configAdmin;
+	    private ConfigurationAdmin configAdmin;
 		private Config currentConfig;
 		final private static String klass = ScraperService.class.getName();
 	    final private static Logger logger = Logger.getLogger(klass);
-	    		
-	    static final Counter configReloadSuccess = Counter.build()
-	    	      .name("waslp_config_reload_success_total")
-	    	      .help("Number of times configuration have successfully been reloaded.").register();
-
-	    static final Counter configReloadFailure = Counter.build()
-	    	      .name("waslp_config_reload_failure_total")
-	    	      .help("Number of times configuration have failed to be reloaded.").register();
-
+	    final private static HashMap<String,Integer> registeredPerPath =new HashMap<String,Integer>();
+	    final private static HashMap<String,CollectorRegistry> collectorRegistries =new HashMap<String,CollectorRegistry>();
+	    final private static HashMap<String,HashMap<String,Collector>> globalCollectors=new HashMap<String,HashMap<String,Collector>>();
+	    Set<Thread> threads=new HashSet<Thread>();
+	    
+	    
 	    private long createTimeNanoSecs = System.nanoTime();
 
 	    private JmxRouter jmxRouter;
@@ -193,7 +194,29 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 		      return mfsList;
 	    }
 
-	    public void clearConnections() {
+	    public void delete() {
+	    	//stop trying to connect, if trying
+			for(Thread connect_thread:threads) {
+				 if (connect_thread.isAlive()) {
+					 connect_thread.interrupt();
+				 }
+			}
+			threads.clear();
+			if(currentConfig!=null) {
+				String path=currentConfig.path;
+				Integer count=registeredPerPath.get(path);
+				if(count!=null) {
+					count--;
+					if(count<=0) {
+						registeredPerPath.remove(path);
+						collectorRegistries.remove(path);
+						globalCollectors.remove(path);
+					}else {
+						registeredPerPath.put(path, count);
+					}
+					
+				}
+			}
 	    	for(RoutedJmxScraper scraper:registeredScrapers.values()) {
 	    		scraper.destroy();
 	    	}
@@ -221,7 +244,7 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 	    				}catch(Exception e) {
 	    					logger.log(Level.SEVERE,"Exception trying to connect, will retry in 15 seconds",e);
 	    					try {
-							    Thread.sleep(15000);
+							    Thread.sleep(15000); 
 							} catch (InterruptedException e1) {
 								return;
 							}  
@@ -233,49 +256,84 @@ public class ScraperService extends Collector implements ManagedService,Collecto
 	    	thread.start();
 	    	threads.add(thread);
 	    }
-	    Set<Thread> threads=new HashSet<Thread>();
-		@Override
+	    public static CollectorRegistry getRegistry(String path) {
+	    	return collectorRegistries.get(path);
+	    }
+	    public static CollectorRegistry getOrCreateRegistry(String path) {
+	    	if(!collectorRegistries.containsKey(path)) {
+	    		collectorRegistries.put(path, new CollectorRegistry());
+	    		registeredPerPath.put(path, 1);
+	    		HashMap<String,Collector> collectors=new HashMap<String,Collector>();
+	    		collectors.put("waslp_config_reload_success_total", Counter.build()
+	  	    	      	.name("waslp_config_reload_success_total")
+	  	    	      	.help("Number of times configuration have successfully been reloaded.")
+	  	    	      	.register(collectorRegistries.get(path)));
+	    		collectors.put("waslp_config_reload_failure_total", Counter.build()
+	    				.name("waslp_config_reload_failure_total")
+		  	    	    .help("Number of times configuration have failed to be reloaded.")
+		  	    	    .register(collectorRegistries.get(path)));
+
+	    	}
+	    	return collectorRegistries.get(path);
+	    }
+	    public void incrementGlobalCounter(String name) {
+	    	if(currentConfig==null) {return;}
+	    	if(!globalCollectors.containsKey(currentConfig.path)) {
+	    		return;
+	    	}
+	    	Counter count=(Counter) globalCollectors.get(currentConfig.path).get(name);
+	    	if(count==null) {
+	    		return;
+	    	}
+	    	count.inc();
+	    }
+	    
+	    
+	    
+	    
+		
 		public void updated(final Dictionary<String, ?> properties) throws ConfigurationException {
-			 //stop trying to connect, if trying
-			 for(Thread connect_thread:threads) {
-				 if (connect_thread.isAlive()) {
-					 connect_thread.interrupt();
-				 }
-			 }
-			 threads.clear();
-			 
-			 
-			 logger.info("Received updated properties");
-			 
+
+
+			 logger.info("Received updated properties");			 
 			 try {
-				 Config new_config=new Config(configAdmin,properties);
-				 Boolean firstConfiguration=currentConfig==null;				 
 				 
-				 if (firstConfiguration||!new_config.basePropertiesAreEqual(currentConfig)) {
-					 clearConnections(); 
+				 Config new_config=new Config(configAdmin,properties);
+				 Boolean should_register=currentConfig==null||!currentConfig.path.equalsIgnoreCase(new_config.path);				 
+				 
+				 if (should_register||!new_config.basePropertiesAreEqual(currentConfig)) {
+					  delete(); 
 					  for(Connection c:new_config.connections) {
 						  connectToOne(c);
 					  }
-					  if(new_config.initializeDefaultExports) {
-						  DefaultExports.initialize();
-					  }
 					  
 				}
+				
 				currentConfig=new_config;
-			 
+				
 			
 			    
-				if(firstConfiguration) {
-					this.register();
+				if(should_register) {
+					CollectorRegistry registry=getOrCreateRegistry(currentConfig.path);
+					this.register(registry);
+					if(currentConfig.initializeDefaultExports) {
+						  new StandardExports().register(registry);
+					      new MemoryPoolsExports().register(registry);
+					      new BufferPoolsExports().register(registry);
+					      new GarbageCollectorExports().register(registry);
+					      new ThreadExports().register(registry);
+					      new ClassLoadingExports().register(registry);
+					      new VersionInfoExports().register(registry);
+					}
 				    logger.info("On your mark...get set...SCRAPE!"); 
 				}else {
 					logger.info("Configuration reloaded");
-					configReloadSuccess.inc();
+					incrementGlobalCounter("waslp_config_reload_success_total");
 				}
 				
 			 }catch(Exception e) {
 				 logger.log(Level.SEVERE,"Configuration reload failed: "+e.getMessage(), e);
-			     configReloadFailure.inc();
+				 incrementGlobalCounter("waslp_config_reload_failure_total");
 			 }
 			 
 		}
