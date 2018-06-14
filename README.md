@@ -18,7 +18,7 @@ wlp\bin\featureManager install prometheusExporter-1.0.0.esa
 A server instance wishing to use the feature should add the `usr:prometheusExporter-1.0` feature to the `featureManager` stanza in `server.xml`.
 The server must (at least) be using Java 8.
 
-After installation, metrics will be available at https://{host}:{port}/prometheusExporter/{configured_path}
+After installation, metrics will be available at http(s)://{host}:{port}/prometheusExporter/{configured_path}
 
 ### Configuration
 
@@ -50,7 +50,7 @@ You may configure multiple stanza in order to provide different rules for differ
 Name     | Description
 ---------|------------
 startDelaySeconds | Start delay before serving any metrics.  Defaults to `0`
-path | Path to make metrics avaiable on.  For instance https://{host}:{port}/prometheusExporter/path1 or https://{host}:{port}/prometheusExporter/path2.  Defaults to `/`
+path | Path to make metrics avaiable on.  For instance http(s)://{host}:{port}/prometheusExporter/path1 or http(s)://{host}:{port}/prometheusExporter/path2.  Defaults to `/`
 lowercaseOutputName | Lowercase the output metric name. Defaults to `true`.
 lowercaseOutputLabelNames | Lowercase the output metric label names. Defaults to `true`.
 connection | Configuration for the MBean connection.
