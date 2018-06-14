@@ -32,15 +32,16 @@ You may configure multiple stanza in order to provide different rules for differ
    <feature>usr:prometheusExporter-1.0</feature>
 </featureManager>
 <prometheusExporter path="/" startDelaySeconds="0" lowercaseOutputName="true" lowercaseOutputLabelNames="true">
-    <connection baseURL="https://localhost:9443" username="admin" password="encoded_password"  sslProtocol="SSL_TLSv2"
-                includeMemberMetrics="true" addIdentificationLabels="true"/>
+    <connection baseURL="https://localhost:9443" username="admin" password="encoded_password"  
+                   sslProtocol="SSL_TLSv2" includeMemberMetrics="true" addIdentificationLabels="true"/>
     <whitelistObjectName>foo.bar:*</whitelistObjectName>
     <blacklistObjectName>foo.bar:*</whitelistObjectName>
     <defaultRule type="GAUGE">
         <label name="label1" value="value1"/>
         <label name="label2" value="value2"/>
     </defaultRule>
-    <rule name="os_metric_$1" help="Some help text" valueFactor="1" attrNameSnakeCase="true" pattern="java.lang{type=OperatingSystem}{}(.*):">
+    <rule name="os_metric_$1" help="Some help text" valueFactor="1" 
+          attrNameSnakeCase="true" pattern="java.lang{type=OperatingSystem}{}(.*):">
         <label name="label1" value=""/>
     </rule>
     <rule name="static" value="1" type="COUNTER"/>
@@ -50,9 +51,9 @@ Name     | Description
 ---------|------------
 startDelaySeconds | Start delay before serving any metrics.  Defaults to `0`
 path | Path to make metrics avaiable on.  For instance https://{host}:{port}/prometheusExporter/path1 or https://{host}:{port}/prometheusExporter/path2.  Defaults to `/`
-lowercaseOutputName | Lowercase the output metric name. Defaults to true.
+lowercaseOutputName | Lowercase the output metric name. Defaults to `true`.
 lowercaseOutputLabelNames | Lowercase the output metric label names. Defaults to `true`.
-connection | Configuration for the JMX connection
+connection | Configuration for the MBean connection.
 baseURL | Base URL of liberty server.  Full JMX URLs are also supported, but they haven't been throughly tested.  If not specified the URL will be looked up from the server mbeans.
 username | The Liberty admin user to use in collective routing or username to authenticate to JMX connection ax.  This value is required to export collective member metrics.
 password | Password for supplied user. XOR encoded values are supported.  This value is required to export collective member metrics.
@@ -61,8 +62,8 @@ includeMemberMetrics | Export collective member metrics using the collective MBe
 addIdentificationLabels | Add lables to each metric to identify which connection it came from.  For a Liberty connection, these are `host`,`userdir`, and `server`. For a JMX connection, these are `jmxurl`. Defaults to `true`.
 whitelistObjectName | A list of [ObjectNames](http://docs.oracle.com/javase/6/docs/api/javax/management/ObjectName.html) to query. Defaults to all mBeans.
 blacklistObjectName | A list of [ObjectNames](http://docs.oracle.com/javase/6/docs/api/javax/management/ObjectName.html) to not query. Takes precedence over `whitelistObjectNames`. Defaults to none.
-defaultRule | Default rule configuration.  Any labels specified here are added to all rules.  If you wish to unset one of the labels at an individual rule, set the value on that rule to `""`
-rule    | A list of rules to apply in order, processing stops at the first matching rule. The processing logic comes from [Prometheus JMX Exporter](https://github.com/prometheus/jmx_exporter/blob/master/README.md)
+defaultRule | Default rule configuration.  Any labels specified here are added to all rules.  If you wish to unset one of the labels at an individual rule, set the value on that rule to `""`.
+rule    | A list of rules to apply in order, processing stops at the first matching rule. The processing logic comes from [Prometheus JMX Exporter](https://github.com/prometheus/jmx_exporter/blob/master/README.md).
 pattern  | Regex pattern to match against each bean attribute. The pattern is not anchored. Capture groups can be used in other options. Defaults to matching everything.  Please note that unlike the JMX Exporter, the pattern here uses `{` and `}` instead of `<` and `>` as these are illegal in XML configuration without encoding.
 attrNameSnakeCase | Converts the attribute name to snake case. This is seen in the names matched by the pattern and the default format. For example, anAttrName to an\_attr\_name. Defaults to `true`.
 name     | The metric name to set. Capture groups from the `pattern` can be used. If not specified, the default format will be used. If it evaluates to empty, processing of this attribute stops with no output.
