@@ -35,7 +35,7 @@ You may configure multiple stanza in order to provide different rules for differ
     <connection baseURL="https://localhost:9443" username="admin" password="encoded_password"  
                    sslProtocol="SSL_TLSv2" includeMemberMetrics="true" addIdentificationLabels="true"/>
     <whitelistObjectName>foo.bar:*</whitelistObjectName>
-    <blacklistObjectName>foo.bar:*</whitelistObjectName>
+    <blacklistObjectName>foo.bar:*</blacklistObjectName>
     <defaultRule type="GAUGE">
         <label name="label1" value="value1"/>
         <label name="label2" value="value2"/>
